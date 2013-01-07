@@ -9,14 +9,15 @@ function [alpha, b] = smosvm(K, y, C, epsilon)
     conv = 0;
     while ~conv
         conv = 1;
-        notatbound = (alpha > smallval) & (alpha < C - smallval);
         partialConv = 0;
         while ~partialConv
             partialConv = 1;
             % Can't write it this way, because if empty it has size [0 1]
             % and Matlab executes the loop for one iteration.
             %for im=find(notatbound)
+            notatbound = (alpha > smallval) & (alpha < C - smallval);
             findnab = find(notatbound);
+            findnab = findnab(randperm(length(findnab)));
             %disp(size(findnab));
             if ~isempty(findnab)
                 for im=1:length(findnab)
@@ -25,11 +26,14 @@ function [alpha, b] = smosvm(K, y, C, epsilon)
                 end
             end
         end
-        for im=1:length(alpha)
+        all = randperm(length(alpha));
+        for im=1:length(all)
             %fprintf('In second bit\n');
-            tryone(im);
+            tryone(all(im));
         end
     end
+    
+    %checkkkt(alpha, y, K, C);
     
     function done = tryone(i)
         %fprintf('Checking conds for: %d\n', i);
@@ -48,12 +52,16 @@ function [alpha, b] = smosvm(K, y, C, epsilon)
         done = 0;
         %[~, allorder] = sort(err(i) - err, 'descend');
         %naborder = allorder(ismember(allorder, find(notatbound)));
-        [~, best] = max(err(i) - err);
-        nab = find(notatbound);
-        ab = find(~notatbound);
-        naborder = nab(randperm(length(nab)));
-        aborder = ab(randperm(length(ab)));
-        for i2=[best, naborder', aborder']
+        % Had a bug here - didn't have abs()
+        [~, best] = max(double(err ~= 0) .* abs(err(i) - err));
+        if err(best) == 0
+            best = [];
+        end
+        nab2 = find(notatbound);
+        ab2 = find(~notatbound);
+        nab2 = nab2(randperm(length(nab2)));
+        ab2 = ab2(randperm(length(ab2)));
+        for i2=[best, nab2', ab2']
             if i2 ~= i
                 %fprintf('Trying %d\n', i2);
                 done = do(i, i2);
