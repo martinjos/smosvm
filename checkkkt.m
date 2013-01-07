@@ -1,4 +1,4 @@
-function checkkkt(alpha, y, K, C)
+function check_kkt(alpha, y, K, C)
 
 bad = zeros(4, 1);
 smallval = 1e-10;

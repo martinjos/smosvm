@@ -33,7 +33,7 @@ function [alpha, b] = smosvm(K, y, C, epsilon)
         end
     end
     
-    %checkkkt(alpha, y, K, C);
+    %check_kkt(alpha, y, K, C);
     
     function done = tryone(i)
         %fprintf('Checking conds for: %d\n', i);

@@ -34,7 +34,7 @@ function [alpha, b] = smosvm_gfx(K, y, C, epsilon, plotfunc)
         end
     end
     
-    checkkkt(alpha, y, K, C);
+    check_kkt(alpha, y, K, C);
     
     function done = tryone(i, isnab)
         %fprintf('Checking conds for: %d\n', i);
