@@ -8,10 +8,9 @@ function alpha = smosvm(K, y, C, epsilon)
     smallval = 1e-10;
     conv = 0;
     while ~conv
-        % always pick the closest to C/2
-        [~, ix] = sort(abs(alpha - C/2));
         conv = 1;
-        for im=1:length(ix)
+        notatbound = (alpha > smallval) & (alpha < C - smallval);
+        for im=[find(notatbound), find(~notatbound)]
             if ~kktok(ix(im))
                 fprintf('First: %d\n', ix(im));
                 if loop2(ix(im))
@@ -24,7 +23,6 @@ function alpha = smosvm(K, y, C, epsilon)
     
     function done = loop2(i)
         done = 0;
-        notatbound = (alpha > smallval) & (alpha < C - smallval);
         %[~, allorder] = sort(err(i) - err, 'descend');
         %naborder = allorder(ismember(allorder, find(notatbound)));
         [~, best] = max(err(i) - err);
@@ -69,7 +67,8 @@ function alpha = smosvm(K, y, C, epsilon)
         if eta < 0
             % function has a maximum
             newalpha = [0, alpha(i2) - y(i2) * (err1 - err2) / eta];
-            disp(newalpha);
+            newalpha(2) = min(ub, max(lb, newalpha(2)));            % clip
+            fprintf('New alpha is %g\n', newalpha(2));
         else
             % function is either increasing or decreasing (or flat)
             lbobj = obj(lb);
@@ -89,7 +88,6 @@ function alpha = smosvm(K, y, C, epsilon)
             return;
         end
         done = 1;
-        newalpha(2) = min(ub, max(lb, newalpha(2)));            % clip
         newalpha(1) = y(i) * y(i2) * (alpha(i2) - newalpha(2)); % find alpha1
         % find new b, update error cache, then save values
         btemp = zeros(2, 1);
