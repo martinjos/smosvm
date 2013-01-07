@@ -1,22 +1,45 @@
-function alpha = smosvm(K, y, C, epsilon)
+function [alpha, b] = smosvm(K, y, C, epsilon)
     if nargin < 5
         epsilon = 1e-3;
     end
     alpha = zeros(size(y));
     err = zeros(size(y));
     b = 0;
-    smallval = 1e-10;
+    smallval = 1e-8;
     conv = 0;
     while ~conv
         conv = 1;
         notatbound = (alpha > smallval) & (alpha < C - smallval);
-        for im=[find(notatbound), find(~notatbound)]
-            if ~kktok(ix(im))
-                fprintf('First: %d\n', ix(im));
-                if loop2(ix(im))
-                    conv = 0;
-                    break;
+        partialConv = 0;
+        while ~partialConv
+            partialConv = 1;
+            % Can't write it this way, because if empty it has size [0 1]
+            % and Matlab executes the loop for one iteration.
+            %for im=find(notatbound)
+            findnab = find(notatbound);
+            %disp(size(findnab));
+            if ~isempty(findnab)
+                for im=1:length(findnab)
+                    %fprintf('In first bit\n');
+                    tryone(findnab(im));
                 end
+            end
+        end
+        for im=1:length(alpha)
+            %fprintf('In second bit\n');
+            tryone(im);
+        end
+    end
+    
+    function done = tryone(i)
+        %fprintf('Checking conds for: %d\n', i);
+        if ~kktok(i)
+            %fprintf('First: %d\n', i);
+            done = loop2(i);
+            if done
+                conv = 0;
+                partialConv = 0;
+                return;
             end
         end
     end
@@ -32,7 +55,7 @@ function alpha = smosvm(K, y, C, epsilon)
         aborder = ab(randperm(length(ab)));
         for i2=[best, naborder', aborder']
             if i2 ~= i
-                fprintf('Trying %d\n', i2);
+                %fprintf('Trying %d\n', i2);
                 done = do(i, i2);
                 if done
                     break;
@@ -60,7 +83,7 @@ function alpha = smosvm(K, y, C, epsilon)
             % Can't make progress, and can't calculate b.
             return;
         end
-        fprintf('Bounds: %g, %g\n', lb, ub);
+        %fprintf('Bounds: %g, %g\n', lb, ub);
         eta = 2*K(i,i2) - K(i,i) - K(i2,i2); % 2nd derivative
         err1 = geterr(i);
         err2 = geterr(i2);
@@ -68,7 +91,7 @@ function alpha = smosvm(K, y, C, epsilon)
             % function has a maximum
             newalpha = [0, alpha(i2) - y(i2) * (err1 - err2) / eta];
             newalpha(2) = min(ub, max(lb, newalpha(2)));            % clip
-            fprintf('New alpha is %g\n', newalpha(2));
+            %fprintf('New alpha is %g\n', newalpha(2));
         else
             % function is either increasing or decreasing (or flat)
             lbobj = obj(lb);
@@ -83,12 +106,20 @@ function alpha = smosvm(K, y, C, epsilon)
                 newalpha = [0, ub];
             end
         end
-        if newalpha(1) == alpha(i) && newalpha(2) == alpha(i2)
+        % make this all a bit more sensible ala pseudocode in SMO paper
+        if newalpha(2) <= smallval
+            newalpha(2) = 0;
+        end
+        if newalpha(2) >= C - smallval
+            newalpha(2) = C;
+        end
+        if abs(newalpha(2) - alpha(i2)) < ...
+                eps*(newalpha(2) + alpha(i2) + eps(newalpha(2) + alpha(i2)))
             % no progress
             return;
         end
-        done = 1;
-        newalpha(1) = y(i) * y(i2) * (alpha(i2) - newalpha(2)); % find alpha1
+        % This was where my mistake was! I didn't have alpha(i) here.
+        newalpha(1) = alpha(i) + y(i) * y(i2) * (alpha(i2) - newalpha(2)); % find alpha1
         % find new b, update error cache, then save values
         btemp = zeros(2, 1);
         I=[i, i2];
@@ -115,7 +146,8 @@ function alpha = smosvm(K, y, C, epsilon)
         alpha(i) = newalpha(1);
         alpha(i2) = newalpha(2);
         b = newb;
-        fprintf('Saved new values (%g, %g) - %g\n', newalpha(1), newalpha(2), newb);
+        done = 1;
+        %fprintf('Saved new values (%g, %g) - %g\n', newalpha(1), newalpha(2), newb);
     end
 
     function e = geterr(i)
@@ -127,9 +159,13 @@ function alpha = smosvm(K, y, C, epsilon)
     end
 
     function ok = kktok(i)
-        if alpha(i) < -smallval || alpha(i) > C + smallval
-            error('alpha %d is outside 0 - C', i);
-        end
+        %fprintf('i has length %g\n', length(i));
+        %fprintf('i: %g\n', i);
+        %fprintf('alpha has length %g\n', length(alpha));
+        %fprintf('alpha is %g\n', alpha(i));
+        %if alpha(i) < -smallval || alpha(i) > C + smallval
+        %    error('alpha %d is outside 0 - C', i);
+        %end
         ok = 1;
         if alpha(i) > smallval && alpha(i) < C - smallval
             if abs(err(i)) > epsilon
